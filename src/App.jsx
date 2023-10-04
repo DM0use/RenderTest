@@ -1,5 +1,5 @@
 import loginService from "./services/login";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Note from "./components/Note";
 import Notification from "./components/Notification";
 import LoginForm from "./components/LoginForm";
@@ -25,9 +25,7 @@ const Footer = () => {
 };
 
 const App = () => {
-  const [loginVisible, setLoginVisible] = useState(false);
   const [notes, setNotes] = useState([]);
-  const [newNote, setNewNote] = useState("a new note...");
   const [showAll, setShowAll] = useState(true);
   const [errorMessage, setErrorMessage] = useState(null);
   const [username, setUsername] = useState("");
@@ -50,17 +48,20 @@ const App = () => {
     }
   }, []);
 
-  const addNote = (event) => {
-    event.preventDefault();
-    const noteObject = {
-      content: newNote,
-      important: Math.random() < 0.5,
-    };
-
-    noteService.create(noteObject).then((returnedNote) => {
-      setNotes(notes.concat(returnedNote));
-      setNewNote("");
-    });
+  const addNote = (noteObject) => {
+    noteFormRef.current.toggleVisibility();
+    noteService
+      .create(noteObject)
+      .then((returnedNote) => {
+        setNotes(notes.concat(returnedNote));
+      })
+      .catch((error) => {
+        console.log(error);
+        setErrorMessage(error.response.data.error);
+        setTimeout(() => {
+          setErrorMessage(null);
+        }, 5000);
+      });
   };
 
   const toggleImportanceOf = (id) => {
@@ -81,10 +82,6 @@ const App = () => {
         }, 5000);
         setNotes(notes.filter((n) => n.id !== id));
       });
-  };
-
-  const handleNoteChange = (event) => {
-    setNewNote(event.target.value);
   };
 
   const handleLogin = async (event) => {
@@ -113,9 +110,6 @@ const App = () => {
   const notesToShow = showAll ? notes : notes.filter((note) => note.important);
 
   const loginForm = () => {
-    const hideWhenVisible = { display: loginVisible ? "none" : "" };
-    const showWhenVisible = { display: loginVisible ? "" : "none" };
-
     return (
       <Togglable buttonLabel="login">
         <LoginForm
@@ -129,13 +123,11 @@ const App = () => {
     );
   };
 
+  const noteFormRef = useRef();
+
   const noteForm = () => (
-    <Togglable buttonLabel="new note">
-      <NoteForm
-        onSubmit={addNote}
-        value={newNote}
-        handleChange={handleNoteChange}
-      />
+    <Togglable buttonLabel="new note" ref={noteFormRef}>
+      <NoteForm createNote={addNote} />
     </Togglable>
   );
 
@@ -143,8 +135,9 @@ const App = () => {
     <div>
       <h1>Notes333</h1>
       <Notification message={errorMessage} />
-      {user === null ? loginForm() : noteForm()}
-      {user && (
+      {user === null ? (
+        loginForm()
+      ) : (
         <div>
           <p>{user.name} logged in</p>
           {noteForm()}
@@ -164,10 +157,6 @@ const App = () => {
           />
         ))}
       </ul>
-      <form onSubmit={addNote}>
-        <input value={newNote} onChange={handleNoteChange} />
-        <button type="submit">save</button>
-      </form>
       <Footer />
     </div>
   );
